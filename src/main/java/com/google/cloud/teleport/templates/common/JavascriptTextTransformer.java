@@ -147,7 +147,7 @@ public abstract class JavascriptTextTransformer {
      * @return The data transformed by the UDF in String format
      */
     @Nullable
-    public String invoke(String data) throws ScriptException, IOException, NoSuchMethodException {
+    public String[] invoke(String data) throws ScriptException, IOException, NoSuchMethodException {
       Invocable invocable = getInvocable();
       if (invocable == null) {
         throw new RuntimeException("No udf was loaded");
@@ -158,7 +158,12 @@ public abstract class JavascriptTextTransformer {
         return null;
 
       } else if (result instanceof String) {
-        return (String) result;
+        String[] res = new String[1];
+        res[0] = (String) result;
+        return res;
+
+      } else if (result instanceof String[]) {
+        return (String[]) result;
 
       } else {
         String className = result.getClass().getName();
@@ -242,13 +247,17 @@ public abstract class JavascriptTextTransformer {
                 public void processElement(ProcessContext c)
                     throws IOException, NoSuchMethodException, ScriptException {
                   String element = c.element();
-
+                  String[] result;
                   if (javascriptRuntime != null) {
-                    element = javascriptRuntime.invoke(element);
+                    result = javascriptRuntime.invoke(element);
+                  } else {
+                    result = new String[1];
+                    result[0] = element;
                   }
-
-                  if (!Strings.isNullOrEmpty(element)) {
-                    c.output(element);
+                  for(String s : result) {
+                    if (!Strings.isNullOrEmpty(s)) {
+                      c.output(s);
+                    }
                   }
                 }
               }));
@@ -311,13 +320,19 @@ public abstract class JavascriptTextTransformer {
                       String payloadStr = element.getPayload();
 
                       try {
+                        String[] res;
                         if (javascriptRuntime != null) {
-                          payloadStr = javascriptRuntime.invoke(payloadStr);
+                          res = javascriptRuntime.invoke(payloadStr);
+                        } else {
+                          res = new String[1];
+                          res[0] = payloadStr;
                         }
 
-                        if (!Strings.isNullOrEmpty(payloadStr)) {
-                          context.output(
-                              FailsafeElement.of(element.getOriginalPayload(), payloadStr));
+                        for(String s : res) {
+                          if (!Strings.isNullOrEmpty(s)) {
+                            context.output(
+                                    FailsafeElement.of(element.getOriginalPayload(), s));
+                          }
                         }
                       } catch (Exception e) {
                         context.output(
